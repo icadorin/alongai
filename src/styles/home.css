@@ -11,5 +11,27 @@
   align-items: center;
   justify-content: center;
   height: 200px;
-  width: 400px;
+  width: 600px;
+}
+
+.timer-container {
+  text-align: center;
+  max-width: 300px;
+  margin: 2rem auto;
+}
+
+.timer-display {
+  font-size: 3rem;
+  font-family: monospace;
+  margin-bottom: 1rem;
+}
+
+.timer-controls button {
+  padding: 0.5rem 1rem;
+  margin: 0 0.5rem;
+  border: none;
+  cursor: pointer;
+  border-radius: 1px;
+  color: var(--color-text);
+  background-color: var(--color-primary);
 }

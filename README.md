@@ -2,7 +2,7 @@
 
 ## 🌐 Link da aplicação
 
-- -- ## --
+- **(Vercel)**: [ https://alongai-ic.vercel.app ].
 
 ## 💻 Prévia da aplicação
 
