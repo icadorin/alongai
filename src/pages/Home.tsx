@@ -6,7 +6,7 @@ export default function Home() {
     <div className="main-content">
       <div className="container">
         <h1>Bem-vindo ao Alongaí!</h1>
-        <p>Um lembrete saudável para alternar entre trabalho e alongamentos</p>
+        <p>Um lembrete saudável para alternar entre atividades no computador e alongamentos</p>
         <DualTimer />
         <div className="health-tips">
           <h3>Dicas para uma rotina mais saudável:</h3>
