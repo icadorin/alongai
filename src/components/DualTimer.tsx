@@ -1,219 +1,328 @@
-import { useState, useEffect, useRef } from 'react';
-import bellStart from '@sounds/bell-start.mp3';
-import bellFinish from '@sounds/bell-finish.mp3';
-import mediumBell from '@sounds/medium-bell-ringing-far.mp3';
-import championSound from '@sounds/champion-telecasted.mp3';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import bellStart from '../sounds/bell-start.mp3';
+import bellFinish from '../sounds/bell-finish.mp3';
+import mediumBell from '../sounds/medium-bell-ringing-far.mp3';
+import championSound from '../sounds/champion-telecasted.mp3';
 
 type TimerMode = 'sitting' | 'preparing' | 'stretching';
 
+const FADE_DURATION_MUSIC = 9;
+
 export function DualTimer() {
   const [isMuted, setIsMuted] = useState(false);
-  const [sittingTime, setSittingTime] = useState(3);
+  const [sittingTime, setSittingTime] = useState(30 * 60);
   const [stretchingTime, setStretchingTime] = useState(15);
   const [preparationTime, setPreparationTime] = useState(10);
-
-  const [timeLeft, setTimeLeft] = useState(sittingTime);
+  const [timeLeft, setTimeLeft] = useState(30 * 60);
   const [isActive, setIsActive] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [mode, setMode] = useState<TimerMode>('sitting');
-  const animationFrameRef = useRef<number>(0);
-  const lastModeRef = useRef<TimerMode>(mode);
 
-  const pausedTimeLeftRef = useRef<number | null>(null);
-  const soundStartRef = useRef<HTMLAudioElement | null>(null);
-  const soundTransitionRef = useRef<HTMLAudioElement | null>(null);
-  const soundPreparationRef = useRef<HTMLAudioElement | null>(null);
-  const soundStretchingRef = useRef<HTMLAudioElement | null>(null);
-  const soundsLoadedRef = useRef(false);
+  const animationFrameRef = useRef<number>(0);
+  const fadeoutAnimationFrameRef = useRef<number>(0);
+  const audioRefs = useRef<{ [key in TimerMode]?: HTMLAudioElement }>({});
+  const soundBellStartRef = useRef<HTMLAudioElement | null>(null);
+  const soundBellFinishRef = useRef<HTMLAudioElement | null>(null);
+
+  const currentFadingAudioRef = useRef<{
+    audio: HTMLAudioElement | null;
+    startTime: number;
+    duration: number;
+    initialVolume: number;
+  } | null>(null);
 
   useEffect(() => {
-    soundStartRef.current = new Audio(bellStart);
-    soundTransitionRef.current = new Audio(bellFinish);
-    soundPreparationRef.current = new Audio(mediumBell);
-    soundStretchingRef.current = new Audio(championSound);
+    soundBellStartRef.current = new Audio(bellStart);
+    soundBellFinishRef.current = new Audio(bellFinish);
+    audioRefs.current.preparing = new Audio(mediumBell);
+    audioRefs.current.stretching = new Audio(championSound);
 
-    Promise.all([
-      new Promise((resolve) => soundStartRef.current?.addEventListener('canplaythrough', resolve)),
-      new Promise((resolve) =>
-        soundTransitionRef.current?.addEventListener('canplaythrough', resolve)
-      ),
-      new Promise((resolve) =>
-        soundPreparationRef.current?.addEventListener('canplaythrough', resolve)
-      ),
-      new Promise((resolve) =>
-        soundStretchingRef.current?.addEventListener('canplaythrough', resolve)
-      ),
-    ])
-      .then(() => {
-        soundsLoadedRef.current = true;
-        console.log('Sons carregados!');
-      })
-      .catch(console.error);
+    const loadPromises = [
+      soundBellStartRef.current,
+      soundBellFinishRef.current,
+      audioRefs.current.preparing,
+      audioRefs.current.stretching,
+    ]
+      .filter(Boolean)
+      .map(
+        (audio) =>
+          new Promise<void>((resolve) => {
+            if (audio) {
+              audio.addEventListener('canplaythrough', () => resolve(), { once: true });
+              if (audio === audioRefs.current.preparing || audio === audioRefs.current.stretching) {
+                audio.loop = true;
+              }
+            } else {
+              resolve();
+            }
+          })
+      );
+
+    Promise.all(loadPromises)
+      .then(() => console.log('Todos os sons carregados!'))
+      .catch((error) => console.error('Erro ao carregar sons:', error));
 
     return () => {
-      [soundStartRef, soundTransitionRef, soundPreparationRef, soundStretchingRef].forEach(
-        (ref) => {
-          ref.current?.pause();
-          ref.current = null;
+      [
+        soundBellStartRef.current,
+        soundBellFinishRef.current,
+        audioRefs.current.preparing,
+        audioRefs.current.stretching,
+      ].forEach((audio) => {
+        if (audio) {
+          audio.pause();
+          audio.currentTime = 0;
+          audio.src = '';
         }
-      );
+      });
     };
   }, []);
 
-  const useLongFadeOut = (
-    audioRef: React.RefObject<HTMLAudioElement>,
-    duration: number,
-    isActive: boolean,
-    isPaused: boolean
-  ) => {
-    const savedProgress = useRef<number | null>(null);
-    const fadeAnimationId = useRef<number | null>(null);
+  const playSound = useCallback(
+    async (audio: HTMLAudioElement | null, loop: boolean = false) => {
+      if (!audio || isMuted) return;
 
-    useEffect(() => {
-      if (!audioRef.current) return;
+      try {
+        audio.currentTime = 0;
+        audio.volume = 1;
+        if (loop) audio.loop = true;
+        await audio.play();
+      } catch (error) {
+        console.error('Erro ao reproduzir som:', error);
+        if (audio.readyState < 3) {
+          console.warn('Som não pronto, tentando carregar e reproduzir novamente...');
+          audio.load();
+          await audio.play().catch((e) => console.error('Erro ao reproduzir após recarregar:', e));
+        }
+      }
+    },
+    [isMuted]
+  );
 
-      const audio = audioRef.current;
-      const FADE_DURATION = 9;
-      const initialVolume = audio.volume;
+  const stopSound = useCallback(
+    (audio: HTMLAudioElement | null) => {
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.volume = isMuted ? 0 : 1;
+      }
+    },
+    [isMuted]
+  );
 
-      // Limpa qualquer animação existente
-      if (fadeAnimationId.current) {
-        cancelAnimationFrame(fadeAnimationId.current);
-        fadeAnimationId.current = null;
+  const stopAllSounds = useCallback(() => {
+    [
+      soundBellStartRef.current,
+      soundBellFinishRef.current,
+      audioRefs.current.preparing,
+      audioRefs.current.stretching,
+    ].forEach((audio) => {
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.volume = isMuted ? 0 : 1;
+      }
+    });
+    cancelAnimationFrame(fadeoutAnimationFrameRef.current);
+    currentFadingAudioRef.current = null;
+  }, [isMuted]);
+
+  const pauseAllSounds = useCallback(() => {
+    [
+      soundBellStartRef.current,
+      soundBellFinishRef.current,
+      audioRefs.current.preparing,
+      audioRefs.current.stretching,
+    ].forEach((audio) => {
+      if (audio) {
+        audio.pause();
+      }
+    });
+    cancelAnimationFrame(fadeoutAnimationFrameRef.current);
+  }, []);
+
+  const applyVolume = useCallback(
+    (audio: HTMLAudioElement | null, targetVolume: number) => {
+      if (audio && !isMuted) {
+        audio.volume = targetVolume;
+      } else if (audio && isMuted) {
+        audio.volume = 0;
+      }
+    },
+    [isMuted]
+  );
+
+  const startFade = useCallback(
+    (audio: HTMLAudioElement | null, fadeDuration: number) => {
+      if (!audio || isMuted) {
+        currentFadingAudioRef.current = null;
+        return;
       }
 
-      const fadeOut = () => {
-        if (!isActive || isPaused) {
-          if (isPaused) {
-            // Salva o progresso atual ao pausar
-            const remaining = duration - (audio.currentTime || 0);
-            savedProgress.current = remaining / FADE_DURATION;
-          }
+      cancelAnimationFrame(fadeoutAnimationFrameRef.current);
+
+      const initialVolume = audio.volume;
+      const startTime = Date.now();
+
+      currentFadingAudioRef.current = {
+        audio,
+        startTime,
+        duration: fadeDuration * 1000,
+        initialVolume,
+      };
+
+      const fadeStep = () => {
+        if (!currentFadingAudioRef.current || currentFadingAudioRef.current.audio !== audio) {
           return;
         }
 
-        const remaining = duration - (audio.currentTime || 0);
-        const progress =
-          savedProgress.current !== null ? savedProgress.current : remaining / FADE_DURATION;
+        const elapsed = Date.now() - currentFadingAudioRef.current.startTime;
+        const progress = Math.min(1, elapsed / currentFadingAudioRef.current.duration);
+        const newVolume = currentFadingAudioRef.current.initialVolume * (1 - progress);
 
-        if (remaining <= FADE_DURATION) {
-          audio.volume = initialVolume * (1 - Math.pow(1 - progress, 0.7));
-          savedProgress.current = null;
-        }
+        applyVolume(audio, newVolume);
 
-        if (remaining > 1) {
-          fadeAnimationId.current = requestAnimationFrame(fadeOut);
+        if (progress < 1) {
+          fadeoutAnimationFrameRef.current = requestAnimationFrame(fadeStep);
         } else {
-          audio.volume = 0;
+          stopSound(audio);
+          currentFadingAudioRef.current = null;
         }
       };
 
-      // Aplica o volume inicial quando despausado
-      if (!isPaused && isActive) {
-        audio.volume = initialVolume;
+      fadeoutAnimationFrameRef.current = requestAnimationFrame(fadeStep);
+    },
+    [isMuted, applyVolume, stopSound]
+  );
+
+  const restoreVolumeFromFade = useCallback(
+    (audio: HTMLAudioElement | null) => {
+      if (audio && currentFadingAudioRef.current && currentFadingAudioRef.current.audio === audio) {
+        const { startTime, duration, initialVolume } = currentFadingAudioRef.current;
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(1, elapsed / duration);
+        audio.volume = initialVolume * (1 - progress);
+        currentFadingAudioRef.current = null;
+        cancelAnimationFrame(fadeoutAnimationFrameRef.current);
+      } else if (audio) {
+        applyVolume(audio, 1);
       }
+    },
+    [applyVolume]
+  );
 
-      fadeAnimationId.current = requestAnimationFrame(fadeOut);
+  const continueFade = useCallback(() => {
+    if (currentFadingAudioRef.current) {
+      const { audio, startTime, duration, initialVolume } = currentFadingAudioRef.current;
+      const now = Date.now();
+      const remainingDuration = duration - (now - startTime);
 
-      return () => {
-        if (fadeAnimationId.current) {
-          cancelAnimationFrame(fadeAnimationId.current);
-        }
-      };
-    }, [isActive, isPaused, duration]);
-  };
+      if (remainingDuration > 0) {
+        currentFadingAudioRef.current = {
+          audio,
+          startTime: now - (duration - remainingDuration),
+          duration,
+          initialVolume,
+        };
+        startFade(audio, remainingDuration / 1000);
+      } else {
+        stopSound(audio);
+        currentFadingAudioRef.current = null;
+      }
+    }
+  }, [startFade, stopSound]);
 
-  const useShortFadeOut = (
-    audioRef: React.RefObject<HTMLAudioElement>,
-    duration: number,
-    isActive: boolean
-  ) => {
-    useEffect(() => {
-      if (!isActive || !audioRef.current) return;
-
-      const audio = audioRef.current;
-      let fadeAnimationId: number;
-      const FADE_DURATION = duration * 0.5; // 50% do tempo total
-      const initialVolume = audio.volume;
-
-      const fadeOut = () => {
-        const remaining = duration - (audio.currentTime || 0);
-
-        if (remaining <= FADE_DURATION) {
-          const progress = remaining / FADE_DURATION;
-          audio.volume = initialVolume * progress; // Linear simples
-        }
-
-        if (remaining > 0) {
-          fadeAnimationId = requestAnimationFrame(fadeOut);
-        } else {
-          audio.volume = 0;
-        }
-      };
-
-      fadeAnimationId = requestAnimationFrame(fadeOut);
-
-      return () => {
-        cancelAnimationFrame(fadeAnimationId);
-        audio.volume = initialVolume;
-      };
-    }, [isActive, duration]);
-  };
-  // TODO ARRUMAR O PAUSE, TIME NÃO ESTA PARANDO, ARRUMAR O ESTADO DO FADEOUT NO PAUSE PARA RESGATAR NO PLAY
-  // No seu componente:
-  useLongFadeOut(soundStretchingRef, stretchingTime, isActive && mode === 'stretching', isPaused);
-
-  useShortFadeOut(soundPreparationRef, preparationTime, isActive && mode === 'preparing');
+  const handleModeTransition = useCallback(() => {
+    if (mode === 'sitting') {
+      playSound(soundBellFinishRef.current, false);
+      setMode('preparing');
+      setTimeLeft(preparationTime);
+      playSound(audioRefs.current.preparing!, true);
+    } else if (mode === 'preparing') {
+      stopSound(audioRefs.current.preparing!);
+      playSound(soundBellFinishRef.current, false);
+      setMode('stretching');
+      setTimeLeft(stretchingTime);
+      playSound(audioRefs.current.stretching!, true);
+    } else {
+      stopSound(audioRefs.current.stretching!);
+      setMode('sitting');
+      setTimeLeft(sittingTime);
+      playSound(soundBellStartRef.current, false);
+    }
+  }, [mode, sittingTime, preparationTime, stretchingTime, playSound, stopSound]);
 
   useEffect(() => {
     if (!isActive) {
       cancelAnimationFrame(animationFrameRef.current);
-      stopSound(soundStretchingRef.current);
-      stopSound(soundPreparationRef.current);
+      stopAllSounds();
       return;
     }
 
     if (isPaused) {
       cancelAnimationFrame(animationFrameRef.current);
-      // Quando pausado, armazenamos o tempo restante
-      pausedTimeLeftRef.current = timeLeft;
+      pauseAllSounds();
       return;
     }
 
-    // Quando despausado, usamos o tempo armazenado ou o tempo normal
-    const initialTimeLeft =
-      pausedTimeLeftRef.current !== null ? pausedTimeLeftRef.current : timeLeft;
-    pausedTimeLeftRef.current = null;
+    if (currentFadingAudioRef.current) {
+      continueFade();
+    } else {
+      if (
+        mode === 'preparing' &&
+        audioRefs.current.preparing &&
+        audioRefs.current.preparing.paused
+      ) {
+        playSound(audioRefs.current.preparing, true);
+      } else if (
+        mode === 'stretching' &&
+        audioRefs.current.stretching &&
+        audioRefs.current.stretching.paused
+      ) {
+        playSound(audioRefs.current.stretching, true);
+      }
+    }
 
     const startTime = Date.now();
-    const endTime = startTime + initialTimeLeft * 1000;
+    const initialTime = timeLeft;
 
     const updateTimer = () => {
-      if (isPaused) return; // Não atualiza se estiver pausado
-
       const now = Date.now();
-      const remaining = Math.max(0, Math.ceil((endTime - now) / 1000));
+      const elapsedSeconds = Math.floor((now - startTime) / 1000);
+      const remaining = Math.max(0, initialTime - elapsedSeconds);
 
       setTimeLeft(remaining);
+
+      const currentAudio =
+        mode === 'preparing'
+          ? audioRefs.current.preparing
+          : mode === 'stretching'
+          ? audioRefs.current.stretching
+          : null;
+
+      const currentModeDuration =
+        mode === 'preparing' ? preparationTime : mode === 'stretching' ? stretchingTime : 0;
+
+      const fadeThreshold =
+        mode === 'stretching'
+          ? FADE_DURATION_MUSIC
+          : mode === 'preparing'
+          ? currentModeDuration * 0.5
+          : 0;
+
+      if (
+        currentAudio &&
+        !currentAudio.paused &&
+        remaining <= fadeThreshold &&
+        !currentFadingAudioRef.current
+      ) {
+        startFade(currentAudio, remaining > 0 ? remaining : 0.1);
+      }
 
       if (remaining > 0) {
         animationFrameRef.current = requestAnimationFrame(updateTimer);
       } else {
-        if (mode === 'sitting') {
-          playSound(soundTransitionRef.current);
-          setMode('preparing');
-          setTimeLeft(preparationTime);
-        } else if (mode === 'preparing') {
-          stopSound(soundPreparationRef.current);
-          playSound(soundStretchingRef.current);
-          setMode('stretching');
-          setTimeLeft(stretchingTime);
-        } else {
-          stopSound(soundStretchingRef.current);
-          playSound(soundStartRef.current);
-          setMode('sitting');
-          setTimeLeft(sittingTime);
-        }
+        handleModeTransition();
       }
     };
 
@@ -221,114 +330,110 @@ export function DualTimer() {
 
     return () => {
       cancelAnimationFrame(animationFrameRef.current);
+      cancelAnimationFrame(fadeoutAnimationFrameRef.current);
     };
-  }, [isActive, isPaused, mode, preparationTime, sittingTime, stretchingTime, timeLeft]);
-
-  const playSound = async (audio: HTMLAudioElement | null) => {
-    if (!audio || !soundsLoadedRef.current || isMuted) return; // Adicionada verificação de isMuted
-
-    try {
-      audio.volume = isMuted ? 0 : 1; // Garante volume zero se muted
-      await audio.play();
-    } catch (error) {
-      console.error('Erro ao reproduzir som:', error);
-      if (audio.src) {
-        audio.load();
-        await audio.play();
-      }
-    }
-  };
-
-  const stopSound = (audio: HTMLAudioElement | null) => {
-    if (!audio) return;
-    audio.pause();
-    audio.currentTime = 0;
-    audio.volume = isMuted ? 0 : 1; // Respeita o estado de mute
-  };
+  }, [
+    isActive,
+    isPaused,
+    timeLeft,
+    mode,
+    sittingTime,
+    preparationTime,
+    stretchingTime,
+    handleModeTransition,
+    playSound,
+    stopAllSounds,
+    pauseAllSounds,
+    startFade,
+    continueFade,
+  ]);
 
   useEffect(() => {
-    if (mode !== lastModeRef.current) {
-      lastModeRef.current = mode;
-
-      if (!isActive) return;
-
-      switch (mode) {
-        case 'preparing':
-          playSound(soundTransitionRef.current);
-          playSound(soundPreparationRef.current);
-          if (soundPreparationRef.current) {
-            soundPreparationRef.current.loop = true;
-          }
-          break;
-        case 'stretching':
-          stopSound(soundPreparationRef.current);
-          playSound(soundStretchingRef.current);
-          if (soundStretchingRef.current) {
-            soundStretchingRef.current.loop = true;
-          }
-          break;
-        case 'sitting':
-          stopSound(soundStretchingRef.current);
-          break;
+    [
+      soundBellStartRef.current,
+      soundBellFinishRef.current,
+      audioRefs.current.preparing,
+      audioRefs.current.stretching,
+    ].forEach((audio) => {
+      if (audio) {
+        audio.volume = isMuted ? 0 : audio.paused ? 0 : 1;
       }
-    }
-  }, [mode, isActive]);
+    });
 
-  const handleReset = () => {
+    if (currentFadingAudioRef.current) {
+      applyVolume(
+        currentFadingAudioRef.current.audio,
+        currentFadingAudioRef.current.audio?.volume || 0
+      );
+    }
+  }, [isMuted, applyVolume]);
+
+  const handleReset = useCallback(() => {
     setIsActive(false);
+    setIsPaused(false);
     setMode('sitting');
     setTimeLeft(sittingTime);
-    stopSound(soundStretchingRef.current);
-    stopSound(soundPreparationRef.current);
-  };
+    stopAllSounds();
+  }, [sittingTime, stopAllSounds]);
 
-  const handleStartPause = () => {
+  const handleMuteToggle = useCallback(() => {
+    const newMutedState = !isMuted;
+    setIsMuted(newMutedState);
+
+    if (!newMutedState && currentFadingAudioRef.current) {
+      restoreVolumeFromFade(currentFadingAudioRef.current.audio);
+      continueFade();
+    }
+  }, [isMuted, continueFade, restoreVolumeFromFade]);
+
+  const handleStartPause = useCallback(() => {
     if (!isActive) {
-      playSound(soundStartRef.current);
       setIsActive(true);
       setIsPaused(false);
+      if (mode === 'sitting') {
+        playSound(soundBellStartRef.current, false);
+      } else if (mode === 'preparing') {
+        playSound(audioRefs.current.preparing!, true);
+      } else if (mode === 'stretching') {
+        playSound(audioRefs.current.stretching!, true);
+      }
     } else {
-      const newPausedState = !isPaused;
-      setIsPaused(newPausedState);
-
-      if (newPausedState) {
-        // Pausando
-        soundStretchingRef.current?.pause();
-        soundPreparationRef.current?.pause();
+      setIsPaused(!isPaused);
+      if (!isPaused) {
+        pauseAllSounds();
       } else {
-        // Despausando - restaura volume antes de tocar
-        if (soundStretchingRef.current && mode === 'stretching') {
-          soundStretchingRef.current.volume = 1;
-          soundStretchingRef.current.play();
-        }
-        if (soundPreparationRef.current && mode === 'preparing') {
-          soundPreparationRef.current.volume = 1;
-          soundPreparationRef.current.play();
+        if (mode === 'preparing' && audioRefs.current.preparing) {
+          playSound(audioRefs.current.preparing, true);
+        } else if (mode === 'stretching' && audioRefs.current.stretching) {
+          playSound(audioRefs.current.stretching, true);
         }
       }
     }
-  };
+  }, [isActive, isPaused, mode, playSound, pauseAllSounds]);
 
-  const formatTime = (totalSeconds: number) => {
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  };
+  const formatTime = useCallback((seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }, []);
 
-  const handleTimeChange = (type: 'sitting' | 'stretching' | 'preparation', value: number) => {
-    if (!isActive) {
-      if (type === 'sitting') {
-        setSittingTime(value);
-        if (mode === 'sitting') setTimeLeft(value);
-      } else if (type === 'stretching') {
-        setStretchingTime(value);
-        if (mode === 'stretching') setTimeLeft(value);
-      } else {
-        setPreparationTime(value);
-        if (mode === 'preparing') setTimeLeft(value);
+  const handleTimeChange = useCallback(
+    (type: 'sitting' | 'stretching' | 'preparation', value: number) => {
+      if (!isActive) {
+        if (type === 'sitting') {
+          setSittingTime(value * 60);
+          if (mode === 'sitting') setTimeLeft(value * 60);
+        } else if (type === 'stretching') {
+          setStretchingTime(value);
+          if (mode === 'stretching') setTimeLeft(value);
+        } else {
+          setPreparationTime(value);
+          if (mode === 'preparing') setTimeLeft(value);
+        }
       }
-    }
-  };
+    },
+    [isActive, mode]
+  );
 
   return (
     <div className="timer-container">
@@ -340,7 +445,6 @@ export function DualTimer() {
           : '🤸‍♂️ Hora de Alongar!'}
       </div>
       <div className="timer-display">{formatTime(timeLeft)}</div>
-
       <div className="timer-settings">
         <div>
           <label>Tempo sentado (min): </label>
@@ -348,17 +452,17 @@ export function DualTimer() {
             type="number"
             min="1"
             value={Math.floor(sittingTime / 60)}
-            onChange={(e) => handleTimeChange('sitting', parseInt(e.target.value) * 60)}
+            onChange={(e) => handleTimeChange('sitting', parseInt(e.target.value))}
             disabled={isActive}
           />
         </div>
         <div>
-          <label>Tempo alongando (min): </label>
+          <label>Tempo alongando (seg): </label>
           <input
             type="number"
-            min="1"
-            value={Math.floor(stretchingTime / 60)}
-            onChange={(e) => handleTimeChange('stretching', parseInt(e.target.value) * 60)}
+            min="5"
+            value={stretchingTime}
+            onChange={(e) => handleTimeChange('stretching', parseInt(e.target.value))}
             disabled={isActive}
           />
         </div>
@@ -374,14 +478,13 @@ export function DualTimer() {
           />
         </div>
       </div>
-
       <div className="timer-controls">
-        <button onClick={handleStartPause}>{isActive ? 'Pausar' : 'Iniciar'}</button>
+        <button onClick={handleStartPause}>
+          {!isActive ? 'Iniciar' : isPaused ? 'Continuar' : 'Pausar'}
+        </button>
         <button onClick={handleReset}>Resetar</button>
       </div>
-      <button onClick={() => setIsMuted(!isMuted)}>
-        {isMuted ? '🔇 Ativar Som' : '🔈 Silenciar'}
-      </button>
+      <button onClick={handleMuteToggle}>{isMuted ? '🔇 Ativar Som' : '🔈 Silenciar'}</button>
     </div>
   );
 }
