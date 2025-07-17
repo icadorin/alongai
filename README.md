@@ -2,7 +2,7 @@
 
 ## 🌐 Link da aplicação
 
-- **(Vercel)**: [ https://alongai-ic.vercel.app ].
+- **(Vercel)**: [ https://alongai-ic.vercel.app (Projeto em execução) ].
 
 ## 💻 Prévia da aplicação
 

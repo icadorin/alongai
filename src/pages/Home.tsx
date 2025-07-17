@@ -1,4 +1,4 @@
-import { DualTimer } from '../components/DualTimer';
+import { DualTimer } from '../components/DualTimer.tsx';
 import '../styles/home.css';
 
 export default function Home() {
