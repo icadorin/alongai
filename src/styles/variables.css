@@ -5,6 +5,13 @@
   --color-accent: #f6ad55;
   --color-text: #f0f0f0;
   --color-muted: #a0a0a0;
+  --color-timer-sit: #b9b9b9;
+  --color-timer-prep: #f6ad55;
+  --color-timer-stretch: #36c21a;
+  --color-focus: #007bff;
+  --color-sound-off: #ff0000;
+  --color-sound-on: #2e4dff;
+  --color-black: #000000;
 
   --font-base: 1rem;
   --font-large: 1.5rem;

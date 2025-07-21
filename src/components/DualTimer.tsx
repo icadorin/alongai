@@ -530,8 +530,8 @@ export function DualTimer() {
           setSittingTime(value * 60);
           if (mode === 'sitting') setTimeLeft(value * 60);
         } else if (type === 'stretching') {
-          setStretchingTime(value);
-          if (mode === 'stretching') setTimeLeft(value);
+          setStretchingTime(value * 60);
+          if (mode === 'stretching') setTimeLeft(value * 60);
         } else {
           setPreparationTime(value);
           if (mode === 'preparing') setTimeLeft(value);
@@ -543,6 +543,16 @@ export function DualTimer() {
 
   return (
     <div className="timer-container">
+      <button
+        className={`sound-button ${isMuted ? 'sound-on' : 'sound-off'}`}
+        onClick={handleMuteToggle}
+      >
+        {isMuted ? (
+          <span className="material-symbols-outlined">volume_off</span>
+        ) : (
+          <span className="material-symbols-outlined">volume_up</span>
+        )}
+      </button>
       <div className={`timer-mode ${mode}`}>
         {mode === 'sitting'
           ? '🪁 Próxima pausa em:'
@@ -550,7 +560,17 @@ export function DualTimer() {
           ? '🔔 Prepare-se para alongar!'
           : '🤸‍♂️ Hora de Alongar!'}
       </div>
-      <div className="timer-display">{formatTime(timeLeft)}</div>
+      <div
+        className={`timer-display ${
+          mode === 'sitting'
+            ? 'border-sit'
+            : mode === 'preparing'
+            ? 'border-prep'
+            : 'border-stretch'
+        }`}
+      >
+        {formatTime(timeLeft)}
+      </div>
       <div className="timer-settings">
         <div>
           <label>Tempo sentado (min): </label>
@@ -590,8 +610,9 @@ export function DualTimer() {
         </button>
         <button onClick={handleReset}>Resetar</button>
       </div>
-      <button onClick={handleHardReset}>Redefinir</button>
-      <button onClick={handleMuteToggle}>{isMuted ? '🔇 Ativar Som' : '🔈 Silenciar'}</button>
+      <div className="timer-controls">
+        <button onClick={handleHardReset}>Redefinir</button>
+      </div>
     </div>
   );
 }
