@@ -5,130 +5,51 @@
   min-height: 100vh;
 }
 
-.container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 200px;
-}
-
 .timer-container {
   text-align: center;
   max-width: 300px;
   margin: 2rem auto;
 }
 
-.timer-display {
-  font-size: 3rem;
-  font-family: monospace;
-  margin-top: 1rem;
-  margin-bottom: 1rem;
+.health-tips {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 1.5rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: 0.8rem 1rem;
   border-radius: 2px;
-}
-
-.border-sit {
-  border: solid 1px var(--color-timer-sit);
-}
-
-.border-prep {
-  border: solid 1px var(--color-timer-prep);
-}
-
-.border-stretch {
-  border: solid 1px var(--color-timer-stretch);
-}
-
-.timer-settings > div {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.timer-settings label {
-  display: inline-block;
-  padding: 0.3rem;
-}
-
-.timer-settings input {
-  height: 20px;
-  width: 70px;
-  border: none;
-  outline: none;
-  text-align: center;
-}
-
-.timer-settings input:disabled {
-  background-color: var(--color-muted);
-}
-
-.timer-settings input:focus {
-  outline: 3px solid var(--color-focus);
-}
-
-.sound-button {
-  position: absolute;
-  top: 60px;
-  right: 60px;
-  border-radius: 50%;
-  height: 40px;
-  width: 40px;
-
-  display: flex;
-  justify-content: center;
-  align-items: center;
-
-  background-color: var(--color-tertiary);
-  color: var(--color-button-text);
-  font-size: 1.5rem;
-  border: none;
-  cursor: pointer;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-}
-
-.sound-button:hover {
-  transform: scale(1.1);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
-}
-
-.sound-button.sound-on {
-  border: solid 2px var(--color-sound-off);
-}
-
-.sound-button.sound-off {
-  border: solid 2px var(--color-sound-on);
-}
-
-.timer-controls {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 0.5rem;
-}
-
-.timer-controls button {
-  padding: 0.6rem 1rem;
-  margin: 0 0.5rem;
-  border: none;
-  cursor: pointer;
-  border-radius: 1px;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  font-size: 0.85rem;
   color: var(--color-text);
-  background-color: var(--color-primary);
-  height: 40px;
-  min-width: 100px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  height: 130px;
+  width: 280px;
 }
 
-/* (Chrome, Safari, Edge, Opera) */
-input[type='number']::-webkit-outer-spin-button,
-input[type='number']::-webkit-inner-spin-button {
-  -webkit-appearance: none;
+.health-tips h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+  color: var(--color-green);
+  letter-spacing: 0.4px;
+}
+
+.tips-list {
+  list-style: none;
+  padding: 0;
   margin: 0;
 }
 
-/* Firefox */
-input[type='number'] {
-  -moz-appearance: textfield;
+.tips-list li {
+  position: relative;
+  padding-left: 1.2rem;
+  margin-bottom: 0.4rem;
+  line-height: 1.3;
+}
+
+.tips-list li::before {
+  content: '▸';
+  position: absolute;
+  left: 0;
+  color: var(--color-green);
+  font-size: 0.9rem;
 }

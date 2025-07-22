@@ -12,6 +12,12 @@
   --color-sound-off: #ff0000;
   --color-sound-on: #2e4dff;
   --color-black: #000000;
+  --color-border: #334155;
+  --color-green: #22c55e;
+  --color-light-green: #22c55e33;
+  --color-dark-blue: #0f172a;
+  --color-midnight-blue: #1e293b;
+  --color-light-blue: #a5f3fc;
 
   --font-base: 1rem;
   --font-large: 1.5rem;

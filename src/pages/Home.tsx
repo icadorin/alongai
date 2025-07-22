@@ -1,5 +1,6 @@
 import { DualTimer } from '../components/DualTimer.tsx';
 import '../styles/home.css';
+import '../styles/dual-timer.css';
 
 export default function Home() {
   return (
@@ -9,11 +10,11 @@ export default function Home() {
         <p>Um lembrete saudável para alternar entre atividades no computador e alongamentos</p>
         <DualTimer />
         <div className="health-tips">
-          <h3>Dicas para uma rotina mais saudável:</h3>
-          <ul>
-            <li>Ajuste sua postura a cada 20 minutos</li>
-            <li>Mantenha os pés apoiados no chão</li>
-            <li>Posicione sua tela na altura dos olhos</li>
+          <h4>Dicas de postura:</h4>
+          <ul className="tips-list">
+            <li>Ajuste a postura a cada 20 min</li>
+            <li>Pés bem apoiados no chão</li>
+            <li>Tela na altura dos olhos</li>
           </ul>
         </div>
       </div>

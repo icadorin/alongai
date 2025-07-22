@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNumericInput } from '../hooks/useNumericInput';
 import bellStart from '../sounds/bell-start.mp3';
 import bellFinish from '../sounds/bell-finish.mp3';
 import mediumBell from '../sounds/medium-bell-ringing-far.mp3';
@@ -55,6 +56,60 @@ export function DualTimer() {
     duration: number;
     initialVolume: number;
   } | null>(null);
+
+  const {
+    inputValue: sittingInputValue,
+    handleInputChange: originalHandleSittingChange,
+    handleInputBlur: originalHandleSittingBlur,
+    inputRef: sittingInputRef,
+  } = useNumericInput({
+    initialValue: sittingTime,
+    setter: setSittingTime,
+    minValue: 20,
+    maxValue: 240,
+    conversionUnit: 60,
+  });
+
+  const handleSittingChange = originalHandleSittingChange;
+  const handleSittingBlur = originalHandleSittingBlur;
+
+  const {
+    inputValue: stretchingInputValue,
+    handleInputChange: handleStretchingChange,
+    handleInputBlur: handleStretchingBlur,
+    inputRef: stretchingInputRef,
+  } = useNumericInput({
+    initialValue: stretchingTime,
+    setter: setStretchingTime,
+    minValue: 1,
+    maxValue: 240,
+    conversionUnit: 60,
+  });
+
+  const {
+    inputValue: preparationInputValue,
+    handleInputChange: handlePreparationChange,
+    handleInputBlur: handlePreparationBlur,
+    inputRef: preparationInputRef,
+  } = useNumericInput({
+    initialValue: preparationTime,
+    setter: setPreparationTime,
+    minValue: 5,
+    maxValue: 30,
+    conversionUnit: 1,
+  });
+
+  useEffect(() => {
+    if (!isActive) {
+      if (mode === 'sitting') {
+        setTimeLeft(sittingTime);
+      } else if (mode === 'stretching') {
+        setTimeLeft(stretchingTime);
+      } else if (mode === 'preparing') {
+        setTimeLeft(preparationTime);
+      }
+    }
+  }, [sittingTime, stretchingTime, preparationTime, isActive, mode]);
 
   useEffect(() => {
     soundBellStartRef.current = new Audio(bellStart);
@@ -523,29 +578,12 @@ export function DualTimer() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }, []);
 
-  const handleTimeChange = useCallback(
-    (type: 'sitting' | 'stretching' | 'preparation', value: number) => {
-      if (!isActive) {
-        if (type === 'sitting') {
-          setSittingTime(value * 60);
-          if (mode === 'sitting') setTimeLeft(value * 60);
-        } else if (type === 'stretching') {
-          setStretchingTime(value * 60);
-          if (mode === 'stretching') setTimeLeft(value * 60);
-        } else {
-          setPreparationTime(value);
-          if (mode === 'preparing') setTimeLeft(value);
-        }
-      }
-    },
-    [isActive, mode]
-  );
-
   return (
     <div className="timer-container">
       <button
         className={`sound-button ${isMuted ? 'sound-on' : 'sound-off'}`}
         onClick={handleMuteToggle}
+        title={isMuted ? 'Ativar Som' : 'Silenciar'}
       >
         {isMuted ? (
           <span className="material-symbols-outlined">volume_off</span>
@@ -553,6 +591,7 @@ export function DualTimer() {
           <span className="material-symbols-outlined">volume_up</span>
         )}
       </button>
+
       <div className={`timer-mode ${mode}`}>
         {mode === 'sitting'
           ? '🪁 Próxima pausa em:'
@@ -560,6 +599,7 @@ export function DualTimer() {
           ? '🔔 Prepare-se para alongar!'
           : '🤸‍♂️ Hora de Alongar!'}
       </div>
+
       <div
         className={`timer-display ${
           mode === 'sitting'
@@ -571,14 +611,18 @@ export function DualTimer() {
       >
         {formatTime(timeLeft)}
       </div>
+
       <div className="timer-settings">
         <div>
           <label>Tempo sentado (min): </label>
           <input
             type="number"
-            min="1"
-            value={Math.floor(sittingTime / 60)}
-            onChange={(e) => handleTimeChange('sitting', parseInt(e.target.value))}
+            min="20"
+            max="240"
+            value={sittingInputValue}
+            onChange={handleSittingChange}
+            onBlur={handleSittingBlur}
+            ref={sittingInputRef}
             disabled={isActive}
           />
         </div>
@@ -586,9 +630,12 @@ export function DualTimer() {
           <label>Tempo alongando (min): </label>
           <input
             type="number"
-            min="5"
-            value={Math.floor(stretchingTime / 60)}
-            onChange={(e) => handleTimeChange('stretching', parseInt(e.target.value))}
+            min="1"
+            max="240"
+            value={stretchingInputValue}
+            onChange={handleStretchingChange}
+            onBlur={handleStretchingBlur}
+            ref={stretchingInputRef}
             disabled={isActive}
           />
         </div>
@@ -598,20 +645,34 @@ export function DualTimer() {
             type="number"
             min="5"
             max="30"
-            value={preparationTime}
-            onChange={(e) => handleTimeChange('preparation', parseInt(e.target.value))}
+            value={preparationInputValue}
+            onChange={handlePreparationChange}
+            onBlur={handlePreparationBlur}
+            ref={preparationInputRef}
             disabled={isActive}
           />
         </div>
       </div>
-      <div className="timer-controls">
-        <button onClick={handleStartPause}>
-          {!isActive ? 'Iniciar' : isPaused ? 'Continuar' : 'Pausar'}
+
+      <div className="timer-controls main-actions">
+        <button
+          onClick={handleStartPause}
+          title={!isActive ? 'Iniciar' : isPaused ? 'Continuar' : 'Pausar'}
+        >
+          {!isActive || isPaused ? (
+            <span className="material-symbols-outlined">play_arrow</span>
+          ) : (
+            <span className="material-symbols-outlined">pause</span>
+          )}
         </button>
-        <button onClick={handleReset}>Resetar</button>
-      </div>
-      <div className="timer-controls">
-        <button onClick={handleHardReset}>Redefinir</button>
+
+        <button onClick={handleReset} title="Reiniciar Timer">
+          <span className="material-symbols-outlined">refresh</span>
+        </button>
+
+        <button onClick={handleHardReset} title="Redefinir valores">
+          <span className="material-symbols-outlined">restart_alt</span>{' '}
+        </button>
       </div>
     </div>
   );
