@@ -61,22 +61,47 @@ export function DualTimer() {
     inputValue: sittingInputValue,
     handleInputChange: originalHandleSittingChange,
     handleInputBlur: originalHandleSittingBlur,
+    handleInputKeyDown: handleSittingKeyDown,
     inputRef: sittingInputRef,
   } = useNumericInput({
     initialValue: sittingTime,
     setter: setSittingTime,
-    minValue: 20,
+    minValue: 1,
     maxValue: 240,
     conversionUnit: 60,
   });
 
-  const handleSittingChange = originalHandleSittingChange;
-  const handleSittingBlur = originalHandleSittingBlur;
+  const handleSittingChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      originalHandleSittingChange(e);
+
+      if (!isActive && mode === 'sitting') {
+        const rawValue = e.target.value;
+        const minutes = parseInt(rawValue, 10);
+
+        if (!isNaN(minutes)) {
+          const clampedMinutes = Math.max(20, Math.min(240, minutes));
+          setTimeLeft(clampedMinutes * 60);
+        } else {
+          setTimeLeft(0);
+        }
+      }
+    },
+    [originalHandleSittingChange, isActive, mode]
+  );
+
+  const handleSittingBlur = useCallback(
+    (e: React.FocusEvent<HTMLInputElement>) => {
+      originalHandleSittingBlur(e);
+    },
+    [originalHandleSittingBlur]
+  );
 
   const {
     inputValue: stretchingInputValue,
     handleInputChange: handleStretchingChange,
     handleInputBlur: handleStretchingBlur,
+    handleInputKeyDown: handleStretchingKeyDown,
     inputRef: stretchingInputRef,
   } = useNumericInput({
     initialValue: stretchingTime,
@@ -90,6 +115,7 @@ export function DualTimer() {
     inputValue: preparationInputValue,
     handleInputChange: handlePreparationChange,
     handleInputBlur: handlePreparationBlur,
+    handleInputKeyDown: handlePreparationKeyDown,
     inputRef: preparationInputRef,
   } = useNumericInput({
     initialValue: preparationTime,
@@ -98,7 +124,7 @@ export function DualTimer() {
     maxValue: 30,
     conversionUnit: 1,
   });
-
+  
   useEffect(() => {
     if (!isActive) {
       if (mode === 'sitting') {
@@ -622,6 +648,7 @@ export function DualTimer() {
             value={sittingInputValue}
             onChange={handleSittingChange}
             onBlur={handleSittingBlur}
+            onKeyDown={handleSittingKeyDown}
             ref={sittingInputRef}
             disabled={isActive}
           />
@@ -635,6 +662,7 @@ export function DualTimer() {
             value={stretchingInputValue}
             onChange={handleStretchingChange}
             onBlur={handleStretchingBlur}
+            onKeyDown={handleStretchingKeyDown}
             ref={stretchingInputRef}
             disabled={isActive}
           />
@@ -648,6 +676,7 @@ export function DualTimer() {
             value={preparationInputValue}
             onChange={handlePreparationChange}
             onBlur={handlePreparationBlur}
+            onKeyDown={handlePreparationKeyDown}
             ref={preparationInputRef}
             disabled={isActive}
           />

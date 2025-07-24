@@ -25,13 +25,14 @@ export const useNumericInput = ({
     const currentDisplayedValue = String(Math.floor(initialValue / conversionUnit));
 
     if (
-      inputValue !== currentDisplayedValue &&
       inputRef.current &&
       document.activeElement !== inputRef.current
     ) {
-      setInputValue(currentDisplayedValue);
+      if (inputValue !== currentDisplayedValue) {
+        setInputValue(currentDisplayedValue);
+      }
     }
-  }, [initialValue, conversionUnit, inputValue]);
+  }, [initialValue, conversionUnit]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     let newValue = e.target.value;
@@ -67,5 +68,13 @@ export const useNumericInput = ({
     [setter, minValue, maxValue, conversionUnit]
   );
 
-  return { inputValue, handleInputChange, handleInputBlur, inputRef };
+  const handleInputKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      if (inputRef.current) {
+        inputRef.current.blur();
+      }
+    }
+  }, []);
+
+  return { inputValue, handleInputChange, handleInputBlur, handleInputKeyDown, inputRef };
 };
