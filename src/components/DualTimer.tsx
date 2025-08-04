@@ -13,6 +13,7 @@ const LOCAL_STORAGE_KEYS = {
   sitting: 'dualTimerSittingTime',
   stretching: 'dualTimerStretchingTime',
   preparation: 'dualTimerPreparationTime',
+  muted: 'dualTimerMutedState',
 };
 
 const DEFAULT_TIMES = {
@@ -22,7 +23,10 @@ const DEFAULT_TIMES = {
 };
 
 export function DualTimer() {
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(() => {
+    const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.muted);
+    return saved ? JSON.parse(saved) : false;
+  });
 
   const [sittingTime, setSittingTime] = useState(() => {
     const saved = localStorage.getItem(LOCAL_STORAGE_KEYS.sitting);
@@ -124,7 +128,7 @@ export function DualTimer() {
     maxValue: 30,
     conversionUnit: 1,
   });
-  
+
   useEffect(() => {
     if (!isActive) {
       if (mode === 'sitting') {
@@ -196,13 +200,17 @@ export function DualTimer() {
     localStorage.setItem(LOCAL_STORAGE_KEYS.preparation, String(preparationTime));
   }, [preparationTime]);
 
+  useEffect(() => {
+    localStorage.setItem(LOCAL_STORAGE_KEYS.muted, JSON.stringify(isMuted));
+  }, [isMuted]);
+
   const playSound = useCallback(
     async (audio: HTMLAudioElement | null, loop: boolean = false) => {
-      if (!audio || isMuted) return;
+      if (!audio) return;
 
       try {
         audio.currentTime = 0;
-        audio.volume = 1;
+        audio.volume = audio === audioRefs.current.stretching && isMuted ? 0 : 1;
         if (loop) audio.loop = true;
         await audio.play();
       } catch (error) {
@@ -222,7 +230,7 @@ export function DualTimer() {
       if (audio) {
         audio.pause();
         audio.currentTime = 0;
-        audio.volume = isMuted ? 0 : 1;
+        audio.volume = audio === audioRefs.current.stretching && isMuted ? 0 : 1;
       }
     },
     [isMuted]
@@ -265,10 +273,12 @@ export function DualTimer() {
 
   const applyVolume = useCallback(
     (audio: HTMLAudioElement | null, targetVolume: number) => {
-      if (audio && !isMuted) {
-        audio.volume = targetVolume;
-      } else if (audio && isMuted) {
-        audio.volume = 0;
+      if (audio) {
+        if (audio === audioRefs.current.stretching) {
+          audio.volume = isMuted ? 0 : targetVolume;
+        } else {
+          audio.volume = targetVolume;
+        }
       }
     },
     [isMuted]
@@ -501,21 +511,17 @@ export function DualTimer() {
   ]);
 
   useEffect(() => {
-    [
-      soundBellStartRef.current,
-      soundBellFinishRef.current,
-      audioRefs.current.preparing,
-      audioRefs.current.stretching,
-    ].forEach((audio) => {
-      if (audio) {
-        audio.volume = isMuted ? 0 : audio.paused ? 0 : 1;
-      }
-    });
+    if (audioRefs.current.stretching) {
+      audioRefs.current.stretching.volume = isMuted ? 0 : 1;
+    }
 
-    if (currentFadingAudioRef.current) {
+    if (
+      currentFadingAudioRef.current &&
+      currentFadingAudioRef.current.audio === audioRefs.current.stretching
+    ) {
       applyVolume(
         currentFadingAudioRef.current.audio,
-        currentFadingAudioRef.current.audio?.volume || 0
+        isMuted ? 0 : currentFadingAudioRef.current.audio?.volume || 0
       );
     }
   }, [isMuted, applyVolume]);
